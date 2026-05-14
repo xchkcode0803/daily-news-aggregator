@@ -1,0 +1,26 @@
+:root {
+  color-scheme: light;
+  --ink: #1b1b1b;
+  --muted: #62656a;
+  --line: #d8d6d0;
+  --paper: #f7f4ee;
+  --surface: #ffffff;
+  --accent: #a63232;
+  --accent-ink: #ffffff;
+  --gold: #c79a42;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Aptos", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+a {
+  color: inherit;
+}
