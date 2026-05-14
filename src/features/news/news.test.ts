@@ -75,7 +75,12 @@ describe("news normalization and parsing", () => {
       source
     );
 
-    expect(dedupeArticles([base!, duplicate!])).toHaveLength(1);
+    expect(base).not.toBeNull();
+    expect(duplicate).not.toBeNull();
+    if (!base || !duplicate) {
+      throw new Error("Expected article candidates in dedupe test");
+    }
+    expect(dedupeArticles([base, duplicate])).toHaveLength(1);
   });
 
   it("filters lookback windows and scores finance relevance", () => {
@@ -94,7 +99,11 @@ describe("news normalization and parsing", () => {
         excerpt: "Federal Reserve inflation market update"
       },
       source
-    )!;
+    );
+    expect(article).not.toBeNull();
+    if (!article) {
+      throw new Error("Expected article candidate in scoring test");
+    }
     expect(scoreArticle(article, 9, now)).toBeGreaterThan(60);
   });
 });

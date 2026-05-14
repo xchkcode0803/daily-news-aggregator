@@ -5,6 +5,10 @@ export function dedupeArticles(items: ArticleCandidate[]) {
   const titleSeen = new Set<string>();
 
   for (const item of items) {
+    if (!item.canonicalUrl?.trim() || !Number.isFinite(item.relevanceScore)) {
+      continue;
+    }
+
     const existing = byUrl.get(item.canonicalUrl);
     if (existing && existing.relevanceScore >= item.relevanceScore) {
       continue;
@@ -13,6 +17,10 @@ export function dedupeArticles(items: ArticleCandidate[]) {
   }
 
   return [...byUrl.values()].filter((item) => {
+    if (!item.normalizedTitleHash) {
+      return false;
+    }
+
     if (titleSeen.has(item.normalizedTitleHash)) {
       return false;
     }

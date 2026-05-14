@@ -66,7 +66,7 @@ export function selectBalancedArticles(articles: ArticleCandidate[], maxItems = 
 
   for (const article of sorted) {
     const regionLimit = article.region === "china" || article.region === "north-america" ? Math.ceil(maxItems * 0.6) : maxItems;
-    if (regionCounts[article.region] >= regionLimit && selected.length < Math.floor(maxItems * 0.8)) {
+    if (regionCounts[article.region] >= regionLimit) {
       continue;
     }
     selected.push(article);

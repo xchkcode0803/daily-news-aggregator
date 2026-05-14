@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import sanitizeHtml from "sanitize-html";
 import { DrizzleReportStore } from "@/features/reports";
 import { isValidReportViewToken } from "@/features/reports/auth";
 import "./report-preview.css";
@@ -19,6 +20,18 @@ export default async function ReportPreviewPage({ params, searchParams }: Report
   if (!preview) {
     notFound();
   }
+
+  const safeHtml = sanitizeHtml(preview.report.html, {
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      "*": ["class"],
+      a: ["href", "name", "target", "rel", "class"]
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    transformTags: {
+      a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer" }, true)
+    }
+  });
 
   return (
     <main className="preview-shell">
@@ -42,7 +55,7 @@ export default async function ReportPreviewPage({ params, searchParams }: Report
           </div>
         </dl>
       </header>
-      <section className="preview-frame" dangerouslySetInnerHTML={{ __html: preview.report.html }} />
+      <section className="preview-frame" dangerouslySetInnerHTML={{ __html: safeHtml }} />
     </main>
   );
 }

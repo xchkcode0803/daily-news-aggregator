@@ -48,12 +48,14 @@ export async function runDailyReport(options: DailyReportOptions): Promise<Daily
   const sources = (options.sources ?? defaultNewsSources).filter((source) => source.enabled);
   const reportDate = getBusinessDate(now, options.timezone);
   const run = await store.getOrCreateRun(reportDate, `daily-report:${reportDate}`);
+  let currentFetchedCount = run.fetchedCount;
+  let currentSelectedCount = run.selectedCount;
 
   const sentDelivery = await store.getSentDelivery(run.id);
-  if (run.status === "sent" && sentDelivery) {
+  if ((run.status === "sent" || run.status === "partial") && sentDelivery) {
     return {
       runId: run.id,
-      status: "sent",
+      status: run.status,
       fetchedCount: run.fetchedCount,
       selectedCount: run.selectedCount,
       emailStatus: "skipped"
@@ -64,22 +66,24 @@ export async function runDailyReport(options: DailyReportOptions): Promise<Daily
     await store.ensureSources(sources);
     const fetchResults = await Promise.all(sources.map((source) => fetchSource(source, options.fetchImpl)));
     await store.saveFetchLogs(run.id, fetchResults);
+    currentFetchedCount = fetchedCount(fetchResults);
 
     const candidates = buildCandidates(fetchResults, sources, options.lookbackHours, now);
     const selected = selectBalancedArticles(dedupeArticles(candidates), 24);
+    currentSelectedCount = selected.length;
 
     if (selected.length === 0) {
       await store.markRun({
         runId: run.id,
         status: "failed",
-        fetchedCount: fetchedCount(fetchResults),
+        fetchedCount: currentFetchedCount,
         selectedCount: 0,
         errorSummary: "No relevant public finance articles found"
       });
       return {
         runId: run.id,
         status: "failed",
-        fetchedCount: fetchedCount(fetchResults),
+        fetchedCount: currentFetchedCount,
         selectedCount: 0,
         emailStatus: "skipped"
       };
@@ -116,15 +120,15 @@ export async function runDailyReport(options: DailyReportOptions): Promise<Daily
       await store.markRun({
         runId: run.id,
         status: "dry_run",
-        fetchedCount: fetchedCount(fetchResults),
-        selectedCount: selected.length,
+        fetchedCount: currentFetchedCount,
+        selectedCount: currentSelectedCount,
         errorSummary: sourceFailureSummary(fetchResults)
       });
       return {
         runId: run.id,
         status: "dry_run",
-        fetchedCount: fetchedCount(fetchResults),
-        selectedCount: selected.length,
+        fetchedCount: currentFetchedCount,
+        selectedCount: currentSelectedCount,
         emailStatus: "skipped"
       };
     }
@@ -146,20 +150,22 @@ export async function runDailyReport(options: DailyReportOptions): Promise<Daily
       errorMessage: emailResult.errorMessage
     });
 
-    const finalStatus = emailResult.status === "sent" && !sourceFailureSummary(fetchResults) ? "sent" : "partial";
+    const sourceSummary = sourceFailureSummary(fetchResults);
+    const errorSummary = [emailResult.errorMessage, sourceSummary].filter(Boolean).join("; ") || null;
+    const finalStatus = emailResult.status === "sent" && !sourceSummary ? "sent" : "partial";
     await store.markRun({
       runId: run.id,
       status: finalStatus,
-      fetchedCount: fetchedCount(fetchResults),
-      selectedCount: selected.length,
-      errorSummary: emailResult.errorMessage ?? sourceFailureSummary(fetchResults)
+      fetchedCount: currentFetchedCount,
+      selectedCount: currentSelectedCount,
+      errorSummary
     });
 
     return {
       runId: run.id,
       status: finalStatus,
-      fetchedCount: fetchedCount(fetchResults),
-      selectedCount: selected.length,
+      fetchedCount: currentFetchedCount,
+      selectedCount: currentSelectedCount,
       emailStatus: emailResult.status === "sent" ? "sent" : "failed"
     };
   } catch (error) {
@@ -168,13 +174,15 @@ export async function runDailyReport(options: DailyReportOptions): Promise<Daily
     await store.markRun({
       runId: run.id,
       status: "failed",
+      fetchedCount: currentFetchedCount,
+      selectedCount: currentSelectedCount,
       errorSummary: message
     });
     return {
       runId: run.id,
       status: "failed",
-      fetchedCount: 0,
-      selectedCount: 0,
+      fetchedCount: currentFetchedCount,
+      selectedCount: currentSelectedCount,
       emailStatus: "failed"
     };
   }
@@ -212,7 +220,13 @@ export function getBusinessDate(date: Date, timeZone: string) {
     day: "2-digit"
   }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value;
-  return `${get("year")}-${get("month")}-${get("day")}`;
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  if (!year || !month || !day) {
+    throw new Error(`Failed to format business date for ${date.toISOString()} in ${timeZone}`);
+  }
+  return `${year}-${month}-${day}`;
 }
 
 function fetchedCount(results: FetchSourceResult[]) {

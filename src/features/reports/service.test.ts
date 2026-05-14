@@ -91,10 +91,20 @@ class MemoryStore implements ReportStore {
 }
 
 function rssResponse(title = "央行发布货币政策与债券市场监管更新") {
+  const escapedTitle = escapeXml(title);
   return new Response(
-    `<?xml version="1.0"?><rss version="2.0"><channel><title>Feed</title><item><title>${title}</title><link>https://example.com/${encodeURIComponent(title)}</link><pubDate>Thu, 14 May 2026 00:00:00 GMT</pubDate><description>通胀 利率 market bank</description></item></channel></rss>`,
+    `<?xml version="1.0"?><rss version="2.0"><channel><title>Feed</title><item><title>${escapedTitle}</title><link>https://example.com/${encodeURIComponent(title)}</link><pubDate>Thu, 14 May 2026 00:00:00 GMT</pubDate><description>通胀 利率 market bank</description></item></channel></rss>`,
     { status: 200 }
   );
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function makeOptions(overrides = {}) {

@@ -1,14 +1,18 @@
 import type { ArticleCandidate } from "@/features/news";
 
 export function buildReportPrompt(articles: ArticleCandidate[], reportDate: string) {
+  if (articles.length === 0) {
+    throw new Error("Cannot build report prompt without articles");
+  }
+
   const sourceLines = articles.map((article, index) => ({
     id: index + 1,
-    title: article.title,
-    source: article.sourceName,
-    region: article.region,
+    title: sanitizePromptText(article.title, 220),
+    source: sanitizePromptText(article.sourceName, 80),
+    region: sanitizePromptText(article.region, 40),
     publishedAt: article.publishedAt?.toISOString() ?? null,
-    url: article.canonicalUrl,
-    excerpt: article.excerpt,
+    url: sanitizePromptText(article.canonicalUrl, 500),
+    excerpt: article.excerpt ? sanitizePromptText(article.excerpt, 700) : null,
     relevanceScore: article.relevanceScore
   }));
 
@@ -28,3 +32,12 @@ ${JSON.stringify(sourceLines, null, 2)}`;
 
 export const reportSystemPrompt =
   "你是面向机构投资、宏观研究、企业财务与跨境业务团队的中文财经简报编辑。你必须输出中文，严格遵守结构化 schema，并保留每条事实的来源链接。";
+
+function sanitizePromptText(value: unknown, maxLength: number) {
+  const cleaned = (typeof value === "string" ? value : "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/ignore previous|disregard instructions|system prompt|developer message/gi, "[removed]");
+
+  return Array.from(cleaned).slice(0, maxLength).join("").trim();
+}

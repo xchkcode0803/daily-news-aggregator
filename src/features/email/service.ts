@@ -32,15 +32,15 @@ export async function sendReportEmail(params: {
     text: params.text
   });
 
-  if (result.error) {
+  if (result.error || !result.data?.id) {
     return {
       status: "failed",
-      errorMessage: result.error.message ?? "Resend delivery failed"
+      errorMessage: result.error?.message ?? "Email delivery failed or no provider response"
     };
   }
 
   return {
     status: "sent",
-    providerMessageId: result.data?.id
+    providerMessageId: result.data.id
   };
 }

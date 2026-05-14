@@ -20,11 +20,11 @@ const validReport = {
 
 describe("finance report schema", () => {
   it("accepts the required Chinese report contract", () => {
-    expect(financeReportSchema.parse(validReport).sections).toHaveLength(5);
+    expect(financeReportSchema.parse(validReport).sections).toHaveLength(reportSectionNames.length);
   });
 
   it("rejects reports missing required sections", () => {
-    const invalid = { ...validReport, sections: validReport.sections.slice(0, 4) };
+    const invalid = { ...validReport, sections: validReport.sections.slice(0, -1) };
     expect(() => financeReportSchema.parse(invalid)).toThrow();
   });
 });

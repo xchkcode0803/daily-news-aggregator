@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "每日财经简报",
-  description: "Daily Chinese finance news report preview"
+  description: "每日中文财经新闻简报预览"
 };
 
 export default function RootLayout({

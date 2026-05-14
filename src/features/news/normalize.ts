@@ -13,7 +13,13 @@ const trackingParams = new Set([
 ]);
 
 export function canonicalizeUrl(url: string, baseUrl?: string) {
-  const parsed = new URL(url, baseUrl);
+  let parsed: URL;
+  try {
+    parsed = new URL(url, baseUrl);
+  } catch {
+    return null;
+  }
+
   parsed.hash = "";
   for (const key of [...parsed.searchParams.keys()]) {
     if (trackingParams.has(key.toLowerCase())) {
@@ -45,22 +51,25 @@ export function parseNewsDate(value: string | undefined | null, now = new Date()
   }
 
   const trimmed = value.trim();
-  const direct = new Date(trimmed);
-  if (!Number.isNaN(direct.getTime())) {
-    return direct;
+  const hasExplicitTimeZone = /(?:z|gmt|utc|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  if (hasExplicitTimeZone) {
+    const direct = new Date(trimmed);
+    return Number.isNaN(direct.getTime()) ? null : direct;
   }
 
   const chineseMatch = trimmed.match(/(?:(\d{4})[年./-])?(\d{1,2})[月./-](\d{1,2})日?(?:\s+(\d{1,2}):(\d{2}))?/);
-  if (!chineseMatch) {
-    return null;
+  if (chineseMatch) {
+    const year = Number(chineseMatch[1] ?? now.getUTCFullYear());
+    const month = Number(chineseMatch[2]) - 1;
+    const day = Number(chineseMatch[3]);
+    const hour = Number(chineseMatch[4] ?? 0);
+    const minute = Number(chineseMatch[5] ?? 0);
+    return new Date(Date.UTC(year, month, day, hour, minute));
   }
 
-  const year = Number(chineseMatch[1] ?? now.getFullYear());
-  const month = Number(chineseMatch[2]) - 1;
-  const day = Number(chineseMatch[3]);
-  const hour = Number(chineseMatch[4] ?? 0);
-  const minute = Number(chineseMatch[5] ?? 0);
-  return new Date(year, month, day, hour, minute);
+  const isoLikeDate = /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(trimmed);
+  const direct = new Date(isoLikeDate ? `${trimmed.replace(" ", "T")}Z` : trimmed);
+  return Number.isNaN(direct.getTime()) ? null : direct;
 }
 
 export function toArticleCandidate(item: NewsItem, source: NewsSourceConfig): ArticleCandidate | null {
@@ -69,6 +78,9 @@ export function toArticleCandidate(item: NewsItem, source: NewsSourceConfig): Ar
   }
 
   const canonicalUrl = canonicalizeUrl(item.url, source.url);
+  if (!canonicalUrl) {
+    return null;
+  }
   const normalizedTitle = normalizeTitle(item.title);
   if (!normalizedTitle) {
     return null;
@@ -87,7 +99,7 @@ export function toArticleCandidate(item: NewsItem, source: NewsSourceConfig): Ar
 
 export function isInsideLookback(publishedAt: Date | null, lookbackHours: number, now = new Date()) {
   if (!publishedAt) {
-    return true;
+    return false;
   }
   const minTime = now.getTime() - lookbackHours * 60 * 60 * 1000;
   return publishedAt.getTime() >= minTime && publishedAt.getTime() <= now.getTime() + 60 * 60 * 1000;

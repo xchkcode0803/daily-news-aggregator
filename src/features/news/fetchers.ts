@@ -26,10 +26,10 @@ export async function fetchSource(source: NewsSourceConfig, fetchImpl: typeof fe
         "user-agent": "daily-chinese-finance-news/0.1 public-news-aggregator"
       }
     });
-    const body = await response.text();
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
+    const body = await response.text();
 
     const items = source.adapterType === "rss" ? await parseRss(body, source) : parseHtmlList(body, source);
     return {
@@ -53,7 +53,14 @@ export async function fetchSource(source: NewsSourceConfig, fetchImpl: typeof fe
 }
 
 export async function parseRss(xml: string, source: NewsSourceConfig): Promise<NewsItem[]> {
-  const feed = await parser.parseString(xml);
+  let feed: Awaited<ReturnType<typeof parser.parseString>>;
+  try {
+    feed = await parser.parseString(xml);
+  } catch (error) {
+    logger.warn("rss parse failed", { sourceKey: source.key, url: source.url, error });
+    return [];
+  }
+
   return feed.items
     .map((item) => ({
       title: cleanText(item.title),
@@ -84,7 +91,13 @@ export function parseHtmlList(html: string, source: NewsSourceConfig, now = new 
       return;
     }
 
-    const url = new URL(href, source.url).toString();
+    let url: string;
+    try {
+      url = new URL(href, source.url).toString();
+    } catch (error) {
+      logger.warn("skipping malformed source URL", { sourceKey: source.key, href, baseUrl: source.url, error });
+      return;
+    }
     if (seen.has(url)) {
       return;
     }
