@@ -18,6 +18,8 @@
     "@neondatabase/serverless": "^1.0.2",
     "@react-email/components": "^1.0.1",
     "@react-email/render": "^1.4.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "cheerio": "1.0.0",
     "drizzle-orm": "^0.45.0",
     "next": "^16.0.7",

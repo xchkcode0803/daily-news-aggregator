@@ -65,6 +65,7 @@ drizzle/
 - Node.js 20+
 - npm
 - A Neon Postgres database
+- An Upstash Redis database
 - An OpenAI API key
 - A Resend API key and verified sender/domain
 - A Vercel project for cron deployment
@@ -107,6 +108,8 @@ RESEND_API_KEY=
 REPORT_FROM=
 REPORT_TO=
 CRON_SECRET=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 REPORT_TIMEZONE=Asia/Shanghai
 NEWS_LOOKBACK_HOURS=36
 REPORT_VIEW_TOKEN=
@@ -121,6 +124,8 @@ REPORT_VIEW_TOKEN=
 | `REPORT_FROM` | Sender address, for example `Finance Desk <reports@example.com>`. |
 | `REPORT_TO` | Comma-separated recipient list. |
 | `CRON_SECRET` | Bearer token required by the cron endpoint. |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL used by the cron rate limiter. |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token used by the cron rate limiter. |
 | `REPORT_TIMEZONE` | Business-date timezone. Defaults to `Asia/Shanghai`. |
 | `NEWS_LOOKBACK_HOURS` | Article lookback window. Defaults to `36`. |
 | `REPORT_VIEW_TOKEN` | Token required to view stored report previews. |
@@ -191,6 +196,10 @@ It requires:
 ```http
 Authorization: Bearer <CRON_SECRET>
 ```
+
+After authorization, the route also checks an Upstash Redis rate limit using the official `@upstash/ratelimit` SDK. The cron endpoint has a hard global cap of **10 authorized requests per Asia/Shanghai calendar date**. The identifier includes the Shanghai date, so the operational window resets when the app computes a new `YYYY-MM-DD` in `Asia/Shanghai`; weekends and public holidays are not treated specially.
+
+The 10-request buffer exists even though the cron is scheduled once per day so operators can manually retry failed runs, test production wiring, and still stop misconfiguration or runaway loops. If the cap is exceeded, the route returns `429`. If Upstash cannot be reached or is not configured, the route intentionally fails closed with `503` and does not run report generation.
 
 The route returns:
 
@@ -281,13 +290,14 @@ The report must:
 ## Production Deployment
 
 1. Create a Neon database.
-2. Add all environment variables to Vercel.
-3. Run database migrations against Neon.
-4. Deploy the app to Vercel.
-5. Run one dry run manually.
-6. Confirm the report row and email delivery row are written.
-7. Confirm `/reports/<runId>?token=...` works.
-8. Enable or verify Vercel Cron.
+2. Create an Upstash Redis database.
+3. Add all environment variables to Vercel, including the Upstash REST URL/token.
+4. Run database migrations against Neon.
+5. Deploy the app to Vercel.
+6. Run one dry run manually.
+7. Confirm the report row and email delivery row are written.
+8. Confirm `/reports/<runId>?token=...` works.
+9. Enable or verify Vercel Cron.
 
 ## Development Commands
 
@@ -321,6 +331,7 @@ Also verify:
 ## Security Notes
 
 - `CRON_SECRET` protects the cron endpoint.
+- Upstash rate limiting caps authorized cron requests at 10 per Shanghai calendar date.
 - `REPORT_VIEW_TOKEN` protects report previews.
 - API keys must live only in environment variables.
 - Email recipients are configured through `REPORT_TO`.
